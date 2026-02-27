@@ -6,16 +6,16 @@ Configuration file for JioMart Automation
 """
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class Config:
-   
-    # TELEGRAM_BOT_TOKEN = "8563837428:AAF8ClpR5pofm0ymICIbaIs-d3zQ2a6-ewg" 
-    # TELEGRAM_CHAT_ID = "1339449111" 
-
-
-    # # my bot
-    TELEGRAM_BOT_TOKEN = "8592538979:AAHI4yN9LR8PA4OHopgDXZTOLIYFowm1rU4" 
-    TELEGRAM_CHAT_ID = "1369318513" 
+    # Telegram Configuration (Read from .env)
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8592538979:AAHI4yN9LR8PA4OHopgDXZTOLIYFowm1rU4") 
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1369318513") 
     
     # Enable/disable Telegram notifications
     TELEGRAM_ENABLED = True
