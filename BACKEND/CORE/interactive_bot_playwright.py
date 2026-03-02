@@ -32,6 +32,7 @@ class InteractiveJioMartBot:
         self.WAIT_COUPON    = 'wait_coupon'
         self.WAIT_AMOUNT   = 'wait_amount'
         self.WAIT_ADDRESS  = 'wait_address'
+        self.WAIT_HEADLESS = 'wait_headless'  # Headless or Headed toggle
         self.WAIT_MULTI_QTY = 'wait_multi_qty'  # multiple URLs ke baad bulk qty
 
     # ── Telegram helpers ──────────────────────────────────────────────
@@ -159,6 +160,15 @@ class InteractiveJioMartBot:
             "Or send `default` to use default address.",
             self.kb("Skip Address"))
 
+    def ask_visibility(self, chat_id):
+        s = self.session(chat_id)
+        s['state'] = self.WAIT_HEADLESS
+        self.send(chat_id,
+            "👁️ *Browser Visibility?*\n\n"
+            "💡 *Headless:* Background mein chalega (Faster, VPS best)\n"
+            "💡 *Headed:* Browser window dikhegi",
+            self.kb("Headless (Hidden)", "Headed (Visible)"))
+
     def _parse_urls(self, text):
         """Extract URLs from comma/newline-separated input. Returns list of {url, name}."""
         items = []
@@ -197,7 +207,8 @@ class InteractiveJioMartBot:
             f"⚡ *Mode:* {d['mode'].capitalize()}\n"
             f"🎟️ *Coupon:* {d['coupon'] or 'None'}\n"
             f"💰 *Limit:* {'₹' + str(int(limit)) if limit < 100000 else 'None'}\n"
-            f"📍 *Address:* {address or 'Default'}",
+            f"📍 *Address:* {address or 'Default'}\n"
+            f"👁️ *Browser:* {'Headless' if d.get('headless') else 'Visible'}",
             self.remove_kb())
         threading.Thread(target=self._run_thread, args=(chat_id, dict(d)), daemon=True).start()
         self.reset(chat_id)
@@ -211,7 +222,7 @@ class InteractiveJioMartBot:
                 coupon=data['coupon'],
                 reorder_count=1,
                 mode=data['mode'],
-                headless=False,
+                headless=data.get('headless', False),
                 monitor_otp=True,
                 otp_wait=15,
                 max_amount=data['max_amount'],
@@ -366,7 +377,7 @@ class InteractiveJioMartBot:
             raw = text.strip().upper()
             if raw in ['SKIP', 'SKIP ADDRESS', 'DEFAULT', '']:
                 s['data']['custom_address'] = None
-                self.launch(chat_id)
+                self.ask_visibility(chat_id)
             else:
                 # Parse pipe format: PIN|HOUSE|FLOOR|TOWER|BUILDING|ROAD|AREA
                 parts = text.split('|')
@@ -380,13 +391,21 @@ class InteractiveJioMartBot:
                         'road':     parts[5].strip(),
                         'area':     parts[6].strip()
                     }
-                    self.launch(chat_id)
+                    self.ask_visibility(chat_id)
                 else:
                     self.send(chat_id, 
                         "❌ *Invalid Format!*\n\n"
                         "Send exactly 7 fields separated by `|` (pipe).\n\n"
                         "Format: `PIN|HOUSE|FLOOR|TOWER|BUILDING|ROAD|AREA`",
                         self.kb("Skip Address"))
+
+        elif state == self.WAIT_HEADLESS:
+            val = text.lower()
+            if 'headless' in val or 'hidden' in val:
+                s['data']['headless'] = True
+            else:
+                s['data']['headless'] = False
+            self.launch(chat_id)
 
         else:
             self.send(chat_id, "💡 /order bhejo shuru karne ke liye.")
