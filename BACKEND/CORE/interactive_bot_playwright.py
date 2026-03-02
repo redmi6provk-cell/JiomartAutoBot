@@ -265,8 +265,8 @@ class InteractiveJioMartBot:
                 "5️⃣ Profiles (e.g. `1 2 3`)\n"
                 "6️⃣ Mode (Parallel/Sequential)\n"
                 "7️⃣ Coupon (optional)\n"
-                "8️⃣ Max Amount (optional)\n"
-                "9️⃣ Address (optional, skip = default)")
+                "9️⃣ Address (optional, skip = default)\n"
+                "🔟 Browser Visibility (Headless/Headed)")
             return
         if text == '/cancel':
             self.reset(chat_id)
