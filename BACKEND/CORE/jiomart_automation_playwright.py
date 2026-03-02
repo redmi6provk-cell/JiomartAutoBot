@@ -441,13 +441,13 @@ class JioMartAutomationAsync:
 
             # --- Form Filling Phase ---
             d_addr = {
-                'pin': '421503',
-                'house': '1002',
-                'floor': '10',
-                'tower': '13A',
-                'building': 'Godrej Vihaa',
-                'road': 'JOVili goan Road',
-                'area': 'Godrej Vihaa'
+                'pin': '421501',
+                'house': '2',
+                'floor': '0',
+                'tower': '1',
+                'building': 'Aswaam Homoeopathy',
+                'road': 'A-2, B Cabin Road',
+                'area': 'Bhawani Mandir Chowk'
             }
             if address_data:
                 d_addr.update(address_data)
@@ -1182,40 +1182,46 @@ class JioMartAutomationAsync:
 
             await asyncio.sleep(5)
             url = self.page.url.lower()
-            
+            # 1. URL-based success markers (Immediate)
+            if "checkout/success" in url or "order-history" in url or "under-process" in url:
+                self.log(f"🎉 SUCCESS: URL match detected! ({url})")
+                return True
+
+            # 2. Page content markers (Patient retrieval)
             content = ""
-            for attempt in range(5): # Increased to 5 attempts for slow redirections
+            for attempt in range(6): # Increased attempts
                 try:
                     content = (await self.page.content()).lower()
-                    if content: break
+                    if content and "loading" not in content: # Ensure it's not just a loader
+                        break
                 except Exception as ce:
-                    self.log(f"  ℹ️ Content retrieval suspended (Page navigating?): {ce}. Waiting 3s (Retry {attempt+1}/5)...")
-                    await asyncio.sleep(3)
+                    self.log(f"  ℹ️ Content retrieval suspended (Page navigating?): {ce}. Waiting 2s (Retry {attempt+1}/6)...")
+                    await asyncio.sleep(2)
             
             if not content:
-                self.log("❌ CRITICAL: Page content unreachable after multiple retries. Assuming redirect in progress.")
-                # If we are in a redirection state, let's assume it might be an OTP screen coming up
-                return True 
+                # If content is unreachable but we are not on a known payment page, assume success
+                payment_domains = ['payments.jio.com', 'jiopay.in', 'razorpay', 'paytm', 'cashfree']
+                on_payment = any(dom in url for dom in payment_domains)
+                if not on_payment and "checkout" not in url:
+                    self.log("🎉 SUCCESS: Navigated away from checkout/payment portal (Content unreachable).")
+                    return True
+                self.log("❌ CRITICAL: Page content unreachable after retries.")
+                return False 
 
             # logic for domains
             payment_domains = ['payments.jio.com', 'jiopay.in', 'razorpay', 'paytm', 'cashfree']
             on_payment = any(dom in url for dom in payment_domains)
             
-            # Explicit success strings (MUST be specific to avoid "Place Order" false positives)
-            # We check for "Order Id" (with space) or "Order Number"
-            explicit_success = ('order id' in content or 'order number' in content or 
-                               'order confirmed' in content or 'thank you for shopping' in content)
+            # 3. Explicit success strings
+            success_keywords = ['order id', 'order number', 'order confirmed', 'thank you for shopping', 'success']
+            explicit_success = any(kw in content for kw in success_keywords)
             
             if explicit_success:
-                self.log("🎉 SUCCESS: Specific order confirmation text found! (v5.0)")
+                self.log("🎉 SUCCESS: Order confirmation text found!")
                 return True
                 
             if not on_payment and "checkout" not in url and url != "about:blank":
                 self.log(f"🎉 SUCCESS: Navigated to non-checkout page: {url}")
-                return True
-            
-            if "order-history" in url or "under-process" in url:
-                self.log("🎉 SUCCESS: Redirected to history/processing page.")
                 return True
 
             self.log(f"❌ FAILED: Still on {url} without clear success markers.")

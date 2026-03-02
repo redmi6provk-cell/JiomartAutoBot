@@ -41,17 +41,23 @@ class InteractiveJioMartBot:
                              params={"timeout": timeout, "offset": self.offset},
                              timeout=timeout + 5)
             return r.json()
-        except:
+        except Exception as e:
+            print(f"Update error: {e}")
             return {"ok": False, "result": []}
 
     def send(self, chat_id, text, markup=None):
-        try:
-            data = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
-            if markup:
-                data["reply_markup"] = json.dumps(markup)
-            requests.post(f"{self.base_url}/sendMessage", data=data, timeout=10)
-        except Exception as e:
-            print(f"Send error: {e}")
+        for attempt in range(3):
+            try:
+                data = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+                if markup:
+                    data["reply_markup"] = json.dumps(markup)
+                requests.post(f"{self.base_url}/sendMessage", data=data, timeout=30)
+                return True
+            except Exception as e:
+                print(f"Send error (attempt {attempt+1}/3): {e}")
+                if attempt < 2:
+                    time.sleep(2)
+        return False
 
     def kb(self, *buttons):
         rows = []

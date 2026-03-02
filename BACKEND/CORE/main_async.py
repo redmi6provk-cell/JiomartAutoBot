@@ -110,13 +110,13 @@ async def run_single_profile(profile_name: str, products: List[dict], coupon: st
             else:
                  # Use default hardcoded if no custom provided
                   await automation.fill_address({
-                     'pin': '421503',
-                     'house': '1002', 
-                     'floor': '10',
-                     'tower': '13A',
-                     'building': 'Godrej Vihaa',
-                     'road': 'JOVili goan Road',
-                     'area': 'Godrej Vihaa'
+                     'pin': '421501',
+                     'house': '2', 
+                     'floor': '0',  
+                     'tower': '1',
+                     'building': 'Aswaam Homoeopathy',
+                     'road': 'A-2, B Cabin Road',
+                     'area': 'Bhawani Mandir Chowk'
                  })
                 
             print(f"[{profile_name}] ✅ Cleanup complete")
@@ -181,6 +181,7 @@ async def run_single_profile(profile_name: str, products: List[dict], coupon: st
             
             # OTP Monitoring
             if monitor_otp:
+                print(f"[{profile_name}] 🔎 Success confirmed. Starting OTP monitoring...")
                 success, otp, _ = await automation.monitor_otp(otp_wait)
                 if success:
                     print(f"[{profile_name}] 🔢 OTP: {otp}")

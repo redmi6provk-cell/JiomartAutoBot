@@ -14,8 +14,8 @@ load_dotenv()
 
 class Config:
     # Telegram Configuration (Read from .env)
-    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8592538979:AAHI4yN9LR8PA4OHopgDXZTOLIYFowm1rU4") 
-    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1369318513") 
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8563837428:AAF8ClpR5pofm0ymICIbaIs-d3zQ2a6-ewg") 
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1339449111") 
     
     # Enable/disable Telegram notifications
     TELEGRAM_ENABLED = True
@@ -66,7 +66,10 @@ class Config:
         "jds-icon[ic='IcPlus']",
         "button:has(jds-icon[ic='IcPlus'])",
         ".IcPlus",
-        "//button[contains(@class, 'add') and contains(@class, 'qty')]"
+        "//button[contains(@class, 'add') and contains(@class, 'qty')]",
+        "//button[contains(., '+')]",
+        "//span[contains(., '+')]/parent::button",
+        "//div[contains(@class, 'plus-icon')]"
     ]
     
     MINUS_BUTTON_SELECTORS = [
