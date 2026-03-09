@@ -12,7 +12,7 @@ import traceback
 import asyncio
 import json
 from config import Config
-from main_async import run_automation_task
+from main_async import run_automation_task, run_otp_check_task
 
 class InteractiveJioMartBot:
     def __init__(self):
@@ -224,7 +224,7 @@ class InteractiveJioMartBot:
                 mode=data['mode'],
                 headless=data.get('headless', False),
                 monitor_otp=True,
-                otp_wait=15,
+                otp_wait=20,
                 max_amount=data['max_amount'],
                 auto_clean=True,
                 custom_address=data.get('custom_address') or None
@@ -235,6 +235,21 @@ class InteractiveJioMartBot:
             self.send(chat_id, f"❌ *Error:*\n`{e}`")
         finally:
             self.active_tasks.pop(chat_id, None)
+
+    def _run_otp_thread(self, chat_id, profiles):
+        try:
+            self.active_tasks[f"{chat_id}_otp"] = {'start_time': time.time(), 'data': {'profiles': profiles, 'mode': 'OTP Check'}}
+            asyncio.run(run_otp_check_task(
+                profiles=profiles,
+                headless=True,  # Default to headless for automated checks
+                otp_wait=5      # Default 5 minutes for manual check
+            ))
+            self.send(chat_id, f"✅ *OTP Check complete for {', '.join(profiles)}!*")
+        except Exception as e:
+            traceback.print_exc()
+            self.send(chat_id, f"❌ *OTP Check Error:*\n`{e}`")
+        finally:
+            self.active_tasks.pop(f"{chat_id}_otp", None)
 
     # ── Message router ────────────────────────────────────────────────
     def handle(self, chat_id, text):
@@ -276,6 +291,20 @@ class InteractiveJioMartBot:
             s['data'] = {'products': []}
             self.ask_url(chat_id)
             return
+            
+        # ── OTP Check Command ──
+        if text.lower().startswith(('check otp', 'otp check', 'otp')):
+            import re
+            nums = re.findall(r'\d+', text)
+            if nums:
+                profiles = [f"Profile {n}" for n in nums]
+                self.send(chat_id, f"🔍 *Starting OTP check for:* {', '.join(profiles)} (Wait 5 min)")
+                threading.Thread(target=self._run_otp_thread, args=(chat_id, profiles), daemon=True).start()
+                return
+            else:
+                self.send(chat_id, "💡 *OTP Check format:*\n`check otp 1 2 3` or `otp 1`")
+                return
+
         if text == '/status':
             if not self.active_tasks:
                 self.send(chat_id, "ℹ️ Koi task nahi chal raha.")

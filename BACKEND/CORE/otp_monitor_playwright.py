@@ -187,7 +187,7 @@ class OTPMonitorPlaywright:
             print(f"[{self.profile_name}] ❌ Nav error: {e}")
             return False
 
-    async def wait_for_otp(self, max_wait_minutes=15):
+    async def wait_for_otp(self, max_wait_minutes=20):
         """Monitor for OTP (Main loop)"""
         try:
             print(f"\n[{self.profile_name}] 👀 Starting Async OTP Monitoring...")
@@ -225,7 +225,7 @@ class OTPMonitorPlaywright:
                     print(f"[{self.profile_name}] ⏳ Waiting... ({elapsed}/{max_wait_minutes} min)")
                 
                 # Refresh periodically
-                if attempt % 8 == 0:
+                if attempt % 4 == 0:
                     print(f"[{self.profile_name}] 🔄 Refreshing...")
                     await self.page.reload()
                     await asyncio.sleep(2)

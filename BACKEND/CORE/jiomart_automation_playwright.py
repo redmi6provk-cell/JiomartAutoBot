@@ -31,6 +31,30 @@ class JioMartAutomationAsync:
         if self.manager:
             await self.manager.cleanup()
 
+    async def get_account_name(self) -> str:
+        """Get account name via OTP monitor"""
+        if not self.otp_monitor:
+            return self.profile_name
+        return await self.otp_monitor.get_account_name()
+
+    async def send_telegram_notification(self, status: str, success: bool):
+        """Send order status notification to Telegram"""
+        if not self.otp_monitor:
+            return
+            
+        icon = "✅" if success else "❌"
+        account_name = self.otp_monitor.account_name or "Unknown"
+        
+        import time
+        message = (
+            f"{icon} <b>JioMart Order Update</b>\n\n"
+            f"👤 Profile: <code>{self.profile_name}</code>\n"
+            f"👤 Account: <code>{account_name}</code>\n"
+            f"📝 Status: <b>{status}</b>\n\n"
+            f"⏰ Time: {time.strftime('%I:%M:%S %p')}"
+        )
+        await self.otp_monitor.send_telegram(message)
+
     def log(self, message):
         print(f"[{self.profile_name}] {message}")
 
@@ -1231,7 +1255,7 @@ class JioMartAutomationAsync:
             self.log(f"❌ Confirm error v3.0: {e}")
             return False
 
-    async def monitor_otp(self, wait_time=15):
+    async def monitor_otp(self, wait_time=20):
         try:
             if not await self.check_browser():
                 return False, None, None

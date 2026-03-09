@@ -14,8 +14,8 @@ load_dotenv()
 
 class Config:
     # Telegram Configuration (Read from .env)
-    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8563837428:AAF8ClpR5pofm0ymICIbaIs-d3zQ2a6-ewg") 
-    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1339449111") 
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8066537205:AAFxIT1znXjQU7b8uyz92z2EuFivkezSvYs") 
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "624131550") 
     
     # Enable/disable Telegram notifications
     TELEGRAM_ENABLED = True
