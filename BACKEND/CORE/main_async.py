@@ -37,7 +37,7 @@ class AutomationRequest(BaseModel):
     parallel_browsers: int = 3
     headless: bool = False
     monitor_otp: bool = True
-    otp_wait_minutes: int = 15
+    otp_wait_minutes: int = 20
 class RemovalRequest(BaseModel):
     profiles_start: int
     profiles_end: int
@@ -80,9 +80,11 @@ async def remove_products(request: RemovalRequest):
 async def run_single_profile(profile_name: str, products: List[dict], coupon: str, 
                              reorder_count: int, headless: bool, monitor_otp: bool, 
                              otp_wait: int, max_amount: float, auto_clean: bool,
-                             custom_address: dict, semaphore: asyncio.Semaphore = None):
+                             custom_address: dict, results_list: list = None, semaphore: asyncio.Semaphore = None):
     automation = None
     released = False
+    success_in_task = False
+    account_info = "Unknown"
     try:
         print(f"\n{'#'*70}")
         print(f"# {profile_name} | STARTING ASYNC")
@@ -93,6 +95,9 @@ async def run_single_profile(profile_name: str, products: List[dict], coupon: st
         # Start Playwright FIRST
         automation = JioMartAutomationAsync(profile_name, headless)
         await automation.start()
+        
+        # Get account name early for notifications
+        account_info = await automation.get_account_name()
 
         # CLEANUP PHASE (Playwright Version - Uses DB Cookies)
         if auto_clean:
@@ -168,7 +173,12 @@ async def run_single_profile(profile_name: str, products: List[dict], coupon: st
                 
             if not await automation.confirm_order():
                 print(f"[{profile_name}] ❌ Order confirmation failed (Definitive failure).")
+                await automation.send_telegram_notification("Order placement FAILED ❌", False)
                 return
+            
+            # If we reached here, order is successful
+            await automation.send_telegram_notification("Order placed successfully! Waiting for OTP... 🕒", True)
+            success_in_task = True
             
             # Optimization: Release semaphore slot early so next profile can start shopping
             if semaphore and not released:
@@ -197,10 +207,78 @@ async def run_single_profile(profile_name: str, products: List[dict], coupon: st
         traceback.print_exc()
         return False
         
+async def run_otp_check_profile(profile_name: str, headless: bool, otp_wait: int = 5):
+    """Stand-alone OTP check for a single profile"""
+    automation = None
+    account_info = "Unknown"
+    try:
+        print(f"\n{'='*70}")
+        print(f"🔍 OTP CHECK | {profile_name}")
+        print(f"{'='*70}\n")
+
+        automation = JioMartAutomationAsync(profile_name, headless)
+        await automation.start()
+        
+        # Get account name
+        account_info = await automation.get_account_name()
+        
+        print(f"[{profile_name}] 🔎 Success confirmed. Starting OTP monitoring...")
+        success, otp, _ = await automation.monitor_otp(otp_wait)
+        
+        if success:
+            print(f"[{profile_name}] 🎉 OTP Found: {otp}")
+            # The monitor_otp already sends the "JioMart Delivery OTP" message
+        else:
+            print(f"[{profile_name}] ❌ No OTP found in {otp_wait} minutes")
+            # Send specific "No OTP Found" message
+            import time
+            message = (
+                f"⚠️ <b>JioMart OTP Status</b>\n\n"
+                f"👤 Profile: <code>{profile_name}</code>\n"
+                f"👤 Account: <code>{account_info}</code>\n"
+                f"❌ Status: <b>No OTP found</b> (Checked for {otp_wait} min)\n\n"
+                f"⏰ Time: {time.strftime('%I:%M:%S %p')}"
+            )
+            await automation.otp_monitor.send_telegram(message)
+
+    except Exception as e:
+        print(f"[{profile_name}] ❌ OTP Check Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
+        if automation:
+            await automation.cleanup()
+
+async def run_otp_check_task(profiles, headless, otp_wait=5):
+    """Orchestrator for standalone OTP checks"""
+    try:
+        max_concurrent = 2
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def sem_run(p, delay):
+            if delay > 0:
+                await asyncio.sleep(delay)
+            async with semaphore:
+                await run_otp_check_profile(p, headless, otp_wait)
+
+        tasks = [sem_run(p, i * 2) for i, p in enumerate(profiles)]
+        await asyncio.gather(*tasks)
+        print(f"\n✅ All OTP checks complete for {profiles}")
+                
+    except Exception as e:
+        print(f"⚠️ OTP Task Error: {e}")
         if semaphore and not released:
             semaphore.release()
             released = True
+            
+        # Record results for summary
+        if results_list is not None:
+            results_list.append({
+                "profile": profile_name,
+                "account": account_info,
+                "success": success_in_task
+            })
+            
         if automation:
             await automation.cleanup()
 
@@ -219,9 +297,10 @@ async def run_automation_task(profiles, products, coupon, reorder_count, mode, h
             await semaphore.acquire()
             await run_single_profile(
                 p, products, coupon, reorder_count, headless, monitor_otp, otp_wait, max_amount,
-                auto_clean, custom_address, semaphore=semaphore
+                auto_clean, custom_address, results_list=results, semaphore=semaphore
             )
 
+        results = []
         if mode == 'parallel':
             # Create tasks for all profiles but throttled by semaphore
             # Add 2s jitter between each profile start to reduce load
@@ -232,9 +311,25 @@ async def run_automation_task(profiles, products, coupon, reorder_count, mode, h
             for profile in profiles:
                 await run_single_profile(
                     profile, products, coupon, reorder_count, headless, monitor_otp, otp_wait, max_amount,
-                    auto_clean, custom_address
+                    auto_clean, custom_address, results_list=results
                 )
                 await asyncio.sleep(2)
+        
+        # PRINT TERMINAL SUMMARY
+        print(f"\n" + "="*50)
+        print(f"🚀 AUTOMATION SUMMARY 🚀")
+        print("="*50)
+        
+        success_count = sum(1 for r in results if r['success'])
+        fail_count = len(results) - success_count
+        
+        for res in results:
+            status = "✅ SUCCESS" if res['success'] else "❌ FAILED"
+            print(f"- {res['profile']} ({res['account']}): {status}")
+            
+        print("="*50)
+        print(f"📊 TOTALS: {success_count} Success | {fail_count} Failed")
+        print("="*50 + "\n")
                 
     except Exception as e:
         print(f"⚠️ Task Error: {e}")
