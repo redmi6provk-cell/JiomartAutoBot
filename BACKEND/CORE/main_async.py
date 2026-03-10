@@ -38,6 +38,8 @@ class AutomationRequest(BaseModel):
     headless: bool = False
     monitor_otp: bool = True
     otp_wait_minutes: int = 1440
+    auto_clean: bool = True
+    custom_address: Optional[dict] = None
 class RemovalRequest(BaseModel):
     profiles_start: int
     profiles_end: int
@@ -88,7 +90,7 @@ async def run_single_profile(profile_name: str, products: List[dict], coupon: st
     try:
         print(f"\n{'#'*70}")
         print(f"# {profile_name} | STARTING ASYNC")
-        if custom_address:
+        if isinstance(custom_address, dict):
             print(f"# Custom Address: {custom_address.get('pin')}")
         print(f"{'#'*70}\n")
 
@@ -300,9 +302,18 @@ async def run_automation_task(profiles, products, coupon, reorder_count, mode, h
             # Manual acquire to allow early release inside run_single_profile
             await semaphore.acquire()
             await run_single_profile(
-                p, products, coupon, reorder_count, headless, monitor_otp,
-                max_amount, auto_clean, custom_address, otp_wait=otp_wait,
-                results_list=results, semaphore=semaphore
+                profile_name=p,
+                products=products,
+                coupon=coupon,
+                reorder_count=reorder_count,
+                headless=headless,
+                monitor_otp=monitor_otp,
+                max_amount=max_amount,
+                auto_clean=auto_clean,
+                custom_address=custom_address,
+                otp_wait=otp_wait,
+                results_list=results,
+                semaphore=semaphore
             )
 
         results = []
@@ -315,8 +326,16 @@ async def run_automation_task(profiles, products, coupon, reorder_count, mode, h
         else: # sequential or single
             for profile in profiles:
                 await run_single_profile(
-                    profile, products, coupon, reorder_count, headless, monitor_otp,
-                    max_amount, auto_clean, custom_address, otp_wait=otp_wait,
+                    profile_name=profile,
+                    products=products,
+                    coupon=coupon,
+                    reorder_count=reorder_count,
+                    headless=headless,
+                    monitor_otp=monitor_otp,
+                    max_amount=max_amount,
+                    auto_clean=auto_clean,
+                    custom_address=custom_address,
+                    otp_wait=otp_wait,
                     results_list=results
                 )
                 await asyncio.sleep(2)
@@ -370,20 +389,19 @@ async def start_automation(request: AutomationRequest):
         print(f"🚀 Starting automation for {len(profiles)} profiles in {mode} mode")
         
         # Start background task WITHOUT await
-        # asyncio.create_task schedules it on the event loop
         asyncio.create_task(
             run_automation_task(
-                profiles, 
-                products, 
-                request.coupon_code, 
-                request.reorder_count,
-                mode,
-                request.headless,
-                request.monitor_otp,
-                request.otp_wait_minutes,
-                request.max_amount,
-                request.auto_clean,
-                request.custom_address
+                profiles=profiles, 
+                products=products, 
+                coupon=request.coupon_code, 
+                reorder_count=request.reorder_count,
+                mode=mode,
+                headless=request.headless,
+                monitor_otp=request.monitor_otp,
+                otp_wait=request.otp_wait_minutes,
+                max_amount=request.max_amount,
+                auto_clean=request.auto_clean,
+                custom_address=request.custom_address
             )
         )
         
