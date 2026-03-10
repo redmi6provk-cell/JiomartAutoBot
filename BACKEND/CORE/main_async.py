@@ -300,8 +300,9 @@ async def run_automation_task(profiles, products, coupon, reorder_count, mode, h
             # Manual acquire to allow early release inside run_single_profile
             await semaphore.acquire()
             await run_single_profile(
-                p, products, coupon, reorder_count, headless, monitor_otp, otp_wait, max_amount,
-                auto_clean, custom_address, results_list=results, semaphore=semaphore
+                p, products, coupon, reorder_count, headless, monitor_otp,
+                max_amount, auto_clean, custom_address, otp_wait=otp_wait,
+                results_list=results, semaphore=semaphore
             )
 
         results = []
@@ -314,8 +315,9 @@ async def run_automation_task(profiles, products, coupon, reorder_count, mode, h
         else: # sequential or single
             for profile in profiles:
                 await run_single_profile(
-                    profile, products, coupon, reorder_count, headless, monitor_otp, otp_wait, max_amount,
-                    auto_clean, custom_address, results_list=results
+                    profile, products, coupon, reorder_count, headless, monitor_otp,
+                    max_amount, auto_clean, custom_address, otp_wait=otp_wait,
+                    results_list=results
                 )
                 await asyncio.sleep(2)
         
