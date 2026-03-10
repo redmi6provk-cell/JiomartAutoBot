@@ -37,7 +37,7 @@ class AutomationRequest(BaseModel):
     parallel_browsers: int = 3
     headless: bool = False
     monitor_otp: bool = True
-    otp_wait_minutes: int = 20
+    otp_wait_minutes: int = 1440
 class RemovalRequest(BaseModel):
     profiles_start: int
     profiles_end: int
@@ -79,8 +79,8 @@ async def remove_products(request: RemovalRequest):
 
 async def run_single_profile(profile_name: str, products: List[dict], coupon: str, 
                              reorder_count: int, headless: bool, monitor_otp: bool, 
-                             otp_wait: int, max_amount: float, auto_clean: bool,
-                             custom_address: dict, results_list: list = None, semaphore: asyncio.Semaphore = None):
+                             max_amount: float, auto_clean: bool,
+                             custom_address: dict, otp_wait: int = 1440, results_list: list = None, semaphore: asyncio.Semaphore = None):
     automation = None
     released = False
     success_in_task = False
@@ -206,8 +206,12 @@ async def run_single_profile(profile_name: str, products: List[dict], coupon: st
         import traceback
         traceback.print_exc()
         return False
+    finally:
+        if automation:
+            print(f"[{profile_name}] 🔒 Closing browser (Cleanup)...")
+            await automation.cleanup()
         
-async def run_otp_check_profile(profile_name: str, headless: bool, otp_wait: int = 5):
+async def run_otp_check_profile(profile_name: str, headless: bool, otp_wait: int = 1440):
     """Stand-alone OTP check for a single profile"""
     automation = None
     account_info = "Unknown"
@@ -249,7 +253,7 @@ async def run_otp_check_profile(profile_name: str, headless: bool, otp_wait: int
         if automation:
             await automation.cleanup()
 
-async def run_otp_check_task(profiles, headless, otp_wait=5):
+async def run_otp_check_task(profiles, headless, otp_wait=1440):
     """Orchestrator for standalone OTP checks"""
     try:
         max_concurrent = 2

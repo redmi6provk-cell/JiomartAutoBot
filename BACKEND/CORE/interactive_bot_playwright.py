@@ -12,6 +12,8 @@ import traceback
 import asyncio
 import json
 from config import Config
+from database import SessionLocal
+from models import Profile
 from main_async import run_automation_task, run_otp_check_task
 
 class InteractiveJioMartBot:
@@ -116,7 +118,8 @@ class InteractiveJioMartBot:
         s['state'] = self.WAIT_PROFILES
         self.send(chat_id,
             "👥 *Profiles bhejo* (space se alag karo)\n"
-            "Example: `1 2 3`",
+            "   • Example: `1 2 3`\n"
+            "   • Type `all` to select all profiles",
             self.remove_kb())
 
     def ask_mode(self, chat_id):
@@ -124,7 +127,7 @@ class InteractiveJioMartBot:
         s['state'] = self.WAIT_MODE
         profiles = s['data']['profiles']
         self.send(chat_id,
-            f"✅ Profiles: {', '.join(profiles)}\n\n"
+            f"✅ *{len(profiles)}* Profiles selected: {', '.join(profiles[:10])}{'...' if len(profiles) > 10 else ''}\n\n"
             "⚡ *Execution Mode?*",
             self.kb("Parallel", "Sequential"))
 
@@ -224,7 +227,7 @@ class InteractiveJioMartBot:
                 mode=data['mode'],
                 headless=data.get('headless', False),
                 monitor_otp=True,
-                otp_wait=20,
+                otp_wait=1440,
                 max_amount=data['max_amount'],
                 auto_clean=True,
                 custom_address=data.get('custom_address') or None
@@ -242,7 +245,7 @@ class InteractiveJioMartBot:
             asyncio.run(run_otp_check_task(
                 profiles=profiles,
                 headless=True,  # Default to headless for automated checks
-                otp_wait=5      # Default 5 minutes for manual check
+                otp_wait=1440      # Indefinite until browser closed
             ))
             self.send(chat_id, f"✅ *OTP Check complete for {', '.join(profiles)}!*")
         except Exception as e:
@@ -298,7 +301,7 @@ class InteractiveJioMartBot:
             nums = re.findall(r'\d+', text)
             if nums:
                 profiles = [f"Profile {n}" for n in nums]
-                self.send(chat_id, f"🔍 *Starting OTP check for:* {', '.join(profiles)} (Wait 5 min)")
+                self.send(chat_id, f"🔍 *Starting OTP check for:* {', '.join(profiles)} (Indefinite check)")
                 threading.Thread(target=self._run_otp_thread, args=(chat_id, profiles), daemon=True).start()
                 return
             else:
@@ -373,12 +376,23 @@ class InteractiveJioMartBot:
 
         elif state == self.WAIT_PROFILES:
             try:
-                nums = [int(x) for x in text.split()]
-                if not nums or len(nums) > 10: raise ValueError()
+                text_low = text.lower().strip()
+                if text_low == 'all':
+                    db = SessionLocal()
+                    try:
+                        all_profiles = db.query(Profile).all()
+                        nums = [p.profile_number for p in all_profiles]
+                    finally:
+                        db.close()
+                else:
+                    nums = [int(x) for x in text.split()]
+                
+                if not nums: raise ValueError()
                 s['data']['profiles'] = [f"Profile {n}" for n in nums]
                 self.ask_mode(chat_id)
-            except:
-                self.send(chat_id, "❌ Invalid. Example: `1 2 3`")
+            except Exception as e:
+                print(f"Profile error: {e}")
+                self.send(chat_id, "❌ Invalid input. Use numbers (e.g. `1 2`) or `all`.")
 
         elif state == self.WAIT_MODE:
             mode = text.lower()

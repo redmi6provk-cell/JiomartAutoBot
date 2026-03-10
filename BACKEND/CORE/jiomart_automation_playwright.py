@@ -1255,7 +1255,7 @@ class JioMartAutomationAsync:
             self.log(f"❌ Confirm error v3.0: {e}")
             return False
 
-    async def monitor_otp(self, wait_time=20):
+    async def monitor_otp(self, wait_time=1440):
         try:
             if not await self.check_browser():
                 return False, None, None

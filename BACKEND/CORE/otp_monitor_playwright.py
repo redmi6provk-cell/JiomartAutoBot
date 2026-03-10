@@ -187,10 +187,11 @@ class OTPMonitorPlaywright:
             print(f"[{self.profile_name}] ❌ Nav error: {e}")
             return False
 
-    async def wait_for_otp(self, max_wait_minutes=20):
-        """Monitor for OTP (Main loop)"""
+    async def wait_for_otp(self, max_wait_minutes=1440):
+        """Monitor for OTP (Main loop) - Indefinite until browser closed"""
         try:
             print(f"\n[{self.profile_name}] 👀 Starting Async OTP Monitoring...")
+            print(f"[{self.profile_name}] 💡 Monitoring will stop if you close the browser window.")
             
             # Get name if missing
             if not self.account_name:
@@ -199,10 +200,22 @@ class OTPMonitorPlaywright:
             # Go to order details
             await self.navigate_to_order_details()
             
+            # Default to 24 hours (1440 mins) if not specified
             max_attempts = max_wait_minutes * 4  # check every 15s -> 4 times/min
             
             for attempt in range(1, max_attempts + 1):
-                otp = await self.check_otp_on_page()
+                # CHECK IF BROWSER/PAGE IS CLOSED
+                if self.page.is_closed():
+                    print(f"[{self.profile_name}] 🛑 Browser closed manually. Stopping OTP monitor.")
+                    return False, None, self.account_name
+
+                try:
+                    otp = await self.check_otp_on_page()
+                except Exception as e:
+                    if "Target page, context or browser has been closed" in str(e):
+                         print(f"[{self.profile_name}] 🛑 Browser closed. Stopping OTP monitor.")
+                         return False, None, self.account_name
+                    raise e
                 
                 if otp:
                     if otp != self.last_otp:
@@ -222,17 +235,22 @@ class OTPMonitorPlaywright:
                 # Progress update
                 if attempt % 4 == 0:
                     elapsed = (attempt * 15) // 60
-                    print(f"[{self.profile_name}] ⏳ Waiting... ({elapsed}/{max_wait_minutes} min)")
+                    print(f"[{self.profile_name}] ⏳ Monitoring... ({elapsed} min elapsed)")
                 
-                # Refresh periodically
+                # Refresh periodically (every 1 minute)
                 if attempt % 4 == 0:
-                    print(f"[{self.profile_name}] 🔄 Refreshing...")
-                    await self.page.reload()
-                    await asyncio.sleep(2)
+                    try:
+                        print(f"[{self.profile_name}] 🔄 Refreshing...")
+                        await self.page.reload()
+                        await asyncio.sleep(2)
+                    except Exception as e:
+                        if "Target page, context or browser has been closed" in str(e):
+                             print(f"[{self.profile_name}] 🛑 Browser closed during refresh.")
+                             return False, None, self.account_name
                 
                 await asyncio.sleep(15)
                 
-            print(f"[{self.profile_name}] ⏰ Timeout waiting for OTP")
+            print(f"[{self.profile_name}] ⏰ Timeout waiting for OTP (Max limit reached)")
             return False, None, self.account_name
             
         except Exception as e:

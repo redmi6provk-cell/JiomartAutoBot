@@ -17,11 +17,12 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8066537205:AAFxIT1znXjQU7b8uyz92z2EuFivkezSvYs") 
     TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "624131550") 
     
+    
     # Enable/disable Telegram notifications
     TELEGRAM_ENABLED = True
     
-    # OTP Configuration
-    OTP_WAIT_TIMEOUT = 600  
+    # OTP Configuration (Default to 24 hours now)
+    OTP_WAIT_TIMEOUT = 1440  
     
     # ==================== URLS ====================
     JIOMART_BASE_URL = "https://www.jiomart.com"
@@ -161,7 +162,6 @@ class Config:
         # Direct text matches
         "//button[contains(text(), 'Make Payment')]",
         "//button[normalize-space(text())='Make Payment']",
-        
         # Attribute-based
         "//button[@name='placeorder']",
         "//button[@title='Make Payment']",
